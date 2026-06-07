@@ -7,7 +7,8 @@ let io;
 export function initSocket(httpServer) {
   io = new Server(httpServer, {
     cors: {
-      origin: "*", // In production: replace with your frontend URL
+      // origin: "*", // In production: replace with your frontend URL
+      origin: "nodejs-production-d170.up.railway.app",
     },
   });
 
