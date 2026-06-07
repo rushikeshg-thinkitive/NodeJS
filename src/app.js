@@ -1,9 +1,31 @@
 import express from "express";
 import morgan from "morgan";
+import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
+import "dotenv/config";
+
+// Routes
+import userRouter from "./routes/user.route.js";
+import conversationRouter from "./routes/conversation.route.js";
+import messageRouter from "./routes/message.route.js";
+import uploadRouter from "./routes/upload.route.js";
 
 const app = express();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Middleware
+app.use(cors());
 app.use(express.json());
 app.use(morgan("dev"));
+
+// Serve uploaded files as static
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
+// API Routes
+app.use("/api", userRouter);
+app.use("/api", conversationRouter);
+app.use("/api", messageRouter);
+app.use("/api", uploadRouter);
 
 export default app;
