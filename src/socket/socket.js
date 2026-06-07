@@ -8,7 +8,12 @@ export function initSocket(httpServer) {
   io = new Server(httpServer, {
     cors: {
       // origin: "*", // In production: replace with your frontend URL
-      origin: "https://nodejs-production-d170.up.railway.app",
+      origin: [
+        "https://nodejs-production-d170.up.railway.app",
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://192.168.1.11:5173",
+        "http://192.168.1.11:5174"],
     },
   });
 
