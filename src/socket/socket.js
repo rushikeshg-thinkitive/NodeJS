@@ -13,7 +13,8 @@ export function initSocket(httpServer) {
         "http://localhost:5173",
         "http://localhost:5174",
         "http://192.168.1.11:5173",
-        "http://192.168.1.11:5174"],
+        "http://192.168.1.11:5174",
+      ],
     },
   });
 

@@ -20,7 +20,7 @@ app.use(express.json());
 app.use(morgan("dev"));
 
 // Serve uploaded files as static
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+// app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // API Routes
 app.use("/api", userRouter);
