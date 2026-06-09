@@ -13,10 +13,12 @@ cloudinary.config({
 // Store directly to Cloudinary instead of local disk
 const storage = new CloudinaryStorage({
   cloudinary,
-  params: {
-    folder: "chat-app",
-    resource_type: "auto", // ← add this line
-    allowed_formats: ["jpg", "jpeg", "png", "gif", "pdf", "doc", "docx"],
+  params: async (req, file) => {
+    return {
+      folder: "chat-app",
+      resource_type: "auto",
+      allowed_formats: ["jpg", "jpeg", "png", "gif", "pdf", "doc", "docx"],
+    };
   },
 });
 
