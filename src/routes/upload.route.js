@@ -24,7 +24,7 @@ uploadRouter.post("/upload", upload.single("file"), async (req, res) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
           folder: "chat-app",
-          resource_type: "auto", // auto detects image/video/raw(pdf/doc)
+          resource_type: "auto",
         },
         (error, result) => {
           if (error) reject(error);
@@ -32,11 +32,17 @@ uploadRouter.post("/upload", upload.single("file"), async (req, res) => {
         },
       );
 
-      // Pipe file buffer to cloudinary
       Readable.from(req.file.buffer).pipe(uploadStream);
     });
 
-    res.json({ url: result.secure_url });
+    // Fix URL for non-image files (pdf, doc etc)
+    // Cloudinary returns /image/upload/ even for raw files — replace it
+    let url = result.secure_url;
+    if (result.resource_type === "raw") {
+      url = url.replace("/image/upload/", "/raw/upload/");
+    }
+
+    res.json({ url });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
