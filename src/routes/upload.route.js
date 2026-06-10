@@ -35,10 +35,11 @@ uploadRouter.post("/upload", upload.single("file"), async (req, res) => {
       Readable.from(req.file.buffer).pipe(uploadStream);
     });
 
-    // Fix URL for non-image files (pdf, doc etc)
-    // Cloudinary returns /image/upload/ even for raw files — replace it
+    // Check mimetype from the uploaded file directly
+    // PDF and docs are not images — fix the URL
+    const isImage = req.file.mimetype.startsWith("image/");
     let url = result.secure_url;
-    if (result.resource_type === "raw") {
+    if (!isImage) {
       url = url.replace("/image/upload/", "/raw/upload/");
     }
 
