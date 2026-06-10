@@ -27,6 +27,12 @@ const conversationSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    // Unread message count per user — { userId: count }
+    unreadCounts: {
+      type: Map,
+      of: Number,
+      default: {},
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

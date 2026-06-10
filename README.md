@@ -12,8 +12,11 @@ Pairs with the React frontend in [`../FE_WEBSOCKET`](../FE_WEBSOCKET).
 - **Node.js + Express** — REST API
 - **Socket.IO** — real-time events
 - **MongoDB + Mongoose** — data storage
-- **Multer** — file uploads
+- **Multer + Cloudinary** — file uploads (stored on Cloudinary)
 - ES Modules (`"type": "module"`)
+
+**Features:** 1-to-1 & group chat, image/file upload, **unread counts**,
+**read receipts**, **replies (quote)**, and **threads**.
 
 ---
 
@@ -28,6 +31,11 @@ Create a `.env` file:
 ```
 MONGO_URI=<your MongoDB connection string>
 PORT=5000
+
+# Cloudinary (for file/image uploads)
+CLOUDINARY_CLOUD_NAME=<your cloud name>
+CLOUDINARY_API_KEY=<your api key>
+CLOUDINARY_API_SECRET=<your api secret>
 ```
 
 Start the server (auto-reloads with nodemon):
@@ -53,10 +61,12 @@ Base URL: `http://localhost:5000/api`
 | GET    | `/users`                      | —                                              | all users                                |
 | POST   | `/conversations`              | `{ name, isGroup, participants[], createdBy }` | created (or existing) conversation       |
 | GET    | `/conversations/:userId`      | `:userId`                                      | that user's conversations (newest first) |
-| GET    | `/messages/:conversationId`   | `:conversationId`                              | that chat's messages (oldest first)      |
-| POST   | `/upload`                     | form-data field `file`                         | `{ url: "/uploads/<name>" }`             |
+| GET    | `/messages/:conversationId`   | `:conversationId`                              | top-level messages (oldest first)        |
+| GET    | `/messages/:messageId/thread` | `:messageId`                                   | replies in that message's thread         |
+| POST   | `/upload`                     | form-data field `file`                         | `{ url: "<cloudinary url>" }`            |
 
-Uploaded files are served statically at `http://localhost:5000/uploads/<name>`.
+Uploads go to **Cloudinary**; `/upload` returns a full `secure_url`. The main
+message list excludes thread replies (`threadId: null`).
 
 > REST is used for **loading history** and **uploading files**. Live actions go
 > through Socket.IO (below).
@@ -75,18 +85,23 @@ Connect to `http://localhost:5000`.
 | `createConversation` | `{ name, isGroup, participants[], createdBy }`                       | Create a chat, notify participants   |
 | `joinConversation`   | `{ conversationId }`                                                 | Enter a chat room to receive its messages |
 | `leaveConversation`  | `{ conversationId }`                                                 | Leave a chat room (call before switching) |
-| `sendMessage`        | `{ conversationId, senderId, type, text?, fileUrl?, fileName? }`     | Save + broadcast a message           |
+| `sendMessage`        | `{ conversationId, senderId, type, text?, fileUrl?, fileName?, replyTo? }` | Save + broadcast a message     |
+| `markAsRead`         | `{ conversationId, userId }`                                         | Reset unread + mark messages read    |
+| `joinThread` / `leaveThread` | `{ messageId }`                                             | Enter / leave a thread room          |
+| `sendThreadMessage`  | `{ threadId, conversationId, senderId, type, text?, fileUrl?, fileName? }` | Save + broadcast a thread reply |
 
-`type` is `"text" | "image" | "file"`.
+`type` is `"text" | "image" | "file"`. `replyTo` is the quoted message's `_id`.
 
 ### Server → Client
 
-| Event                 | Payload         | Sent to                  | Notes                               |
-| --------------------- | --------------- | ------------------------ | ----------------------------------- |
-| `conversationCreated` | conversation    | each participant's room  | participants are **IDs only**       |
-| `conversationUpdated` | conversation    | each participant's room  | participants are **IDs only**       |
-| `newMessage`          | message         | the conversation room    | `senderId` is **populated**         |
-| `error`               | `{ message }`   | the offending socket     | on failures                         |
+| Event                 | Payload                        | Sent to                  | Notes                          |
+| --------------------- | ------------------------------ | ------------------------ | ------------------------------ |
+| `conversationCreated` | conversation                   | each participant's room  | participants are **IDs only**  |
+| `conversationUpdated` | conversation                   | each participant's room  | carries `unreadCounts`         |
+| `newMessage`          | message                        | the conversation room    | `senderId` + `replyTo` populated |
+| `messagesRead`        | `{ conversationId, userId }`   | the conversation room    | so others update read ticks    |
+| `newThreadMessage`    | message                        | the thread room          | `senderId` populated           |
+| `error`               | `{ message }`                  | the offending socket     | on failures                    |
 
 ### How the two rooms work
 
@@ -103,10 +118,15 @@ Connect to `http://localhost:5000`.
 **User** — `{ name, phoneNumber (unique) }`
 
 **Conversation** — `{ name (null for 1-to-1), isGroup, participants[ref User],
-lastMessage, lastMessageAt, createdBy }`
+lastMessage, lastMessageAt, createdBy, unreadCounts (Map userId→count) }`
 
 **Message** — `{ conversationId, senderId, type (text|image|file), text, fileUrl,
-fileName }`
+fileName, readBy[ref User], replyTo (ref Message), threadId (ref Message) }`
+
+- `unreadCounts` — per-user unread tally; bumped on send, reset by `markAsRead`.
+- `readBy` — who has read the message (drives read receipts).
+- `replyTo` — inline quote; the message stays in the main list.
+- `threadId` — set on thread replies; main list returns only `threadId: null`.
 
 Both `Conversation.participants` and `Message.{conversationId,createdAt}` are
 indexed for fast lookups.
@@ -127,7 +147,6 @@ src/
   models/                      Mongoose schemas (User, Conversation, Message)
   socket/
     socket.js                  All Socket.IO event handlers
-uploads/                       Uploaded files (served at /uploads)
 ```
 
 ---
@@ -135,8 +154,13 @@ uploads/                       Uploaded files (served at /uploads)
 ## Notes
 
 - **No auth in V1** — clients identify themselves by sending a `userId`.
-- **CORS** is open (`origin: "*"`) for local development.
-- Sending a message updates the conversation's `lastMessage` / `lastMessageAt`,
-  which is what powers the live, auto-sorting conversation list on the frontend.
+- **CORS** — the Socket.IO server allows a specific list of origins (localhost
+  dev ports + the deployed frontend URL) in `src/socket/socket.js`. Add your own
+  frontend origin there if needed.
+- **Uploads** go to **Cloudinary** (files are streamed from memory, not saved to
+  disk), so `/upload` returns a full hosted URL.
+- Sending a message updates the conversation's `lastMessage` / `lastMessageAt`
+  and per-user `unreadCounts`, which powers the live, auto-sorting conversation
+  list and unread badges on the frontend.
 ```
 
