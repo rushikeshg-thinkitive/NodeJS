@@ -28,7 +28,9 @@ uploadRouter.post("/upload", upload.single("file"), async (req, res) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
           folder: "chat-app",
-          resource_type, // "image" for images, "raw" for pdf/doc/etc
+          resource_type,
+          use_filename: true, // use original filename
+          unique_filename: true, // keep it unique
         },
         (error, result) => {
           if (error) reject(error);
