@@ -20,11 +20,15 @@ uploadRouter.post("/upload", upload.single("file"), async (req, res) => {
   }
 
   try {
+    // Determine resource_type BEFORE uploading
+    const isImage = req.file.mimetype.startsWith("image/");
+    const resource_type = isImage ? "image" : "raw";
+
     const result = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
           folder: "chat-app",
-          resource_type: "auto",
+          resource_type, // "image" for images, "raw" for pdf/doc/etc
         },
         (error, result) => {
           if (error) reject(error);
@@ -35,15 +39,7 @@ uploadRouter.post("/upload", upload.single("file"), async (req, res) => {
       Readable.from(req.file.buffer).pipe(uploadStream);
     });
 
-    // Check mimetype from the uploaded file directly
-    // PDF and docs are not images — fix the URL
-    const isImage = req.file.mimetype.startsWith("image/");
-    let url = result.secure_url;
-    if (!isImage) {
-      url = url.replace("/image/upload/", "/raw/upload/");
-    }
-
-    res.json({ url });
+    res.json({ url: result.secure_url });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
