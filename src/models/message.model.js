@@ -48,6 +48,12 @@ const messageSchema = new mongoose.Schema(
       ref: "Message",
       default: null,
     },
+    // True once this message has at least one thread reply.
+    // Lets the frontend show a "thread exists" indicator without a count.
+    hasThread: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true },
 );

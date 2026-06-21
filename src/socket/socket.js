@@ -214,6 +214,11 @@ export function initSocket(httpServer) {
 
         // Broadcast to everyone viewing this thread
         io.to(`thread:${threadId}`).emit("newThreadMessage", message);
+
+        // Mark the parent so the main chat can show a "thread exists" indicator,
+        // and notify the conversation room so it appears live (no refresh).
+        await Message.findByIdAndUpdate(threadId, { hasThread: true });
+        io.to(conversationId).emit("threadUpdated", { messageId: threadId });
       } catch (error) {
         socket.emit("error", { message: error.message });
       }

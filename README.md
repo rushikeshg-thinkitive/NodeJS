@@ -101,6 +101,7 @@ Connect to `http://localhost:5000`.
 | `newMessage`          | message                        | the conversation room    | `senderId` + `replyTo` populated |
 | `messagesRead`        | `{ conversationId, userId }`   | the conversation room    | so others update read ticks    |
 | `newThreadMessage`    | message                        | the thread room          | `senderId` populated           |
+| `threadUpdated`       | `{ messageId }`                | the conversation room    | parent now has a thread (sets indicator) |
 | `error`               | `{ message }`                  | the offending socket     | on failures                    |
 
 ### How the two rooms work
@@ -121,12 +122,15 @@ Connect to `http://localhost:5000`.
 lastMessage, lastMessageAt, createdBy, unreadCounts (Map userId→count) }`
 
 **Message** — `{ conversationId, senderId, type (text|image|file), text, fileUrl,
-fileName, readBy[ref User], replyTo (ref Message), threadId (ref Message) }`
+fileName, readBy[ref User], replyTo (ref Message), threadId (ref Message), hasThread }`
 
 - `unreadCounts` — per-user unread tally; bumped on send, reset by `markAsRead`.
 - `readBy` — who has read the message (drives read receipts).
 - `replyTo` — inline quote; the message stays in the main list.
 - `threadId` — set on thread replies; main list returns only `threadId: null`.
+- `hasThread` — set `true` on a parent message once it gets its first thread reply;
+  the frontend uses it to show a "thread exists" indicator (no count). A `threadUpdated`
+  event is emitted to the conversation room so the indicator appears live.
 
 Both `Conversation.participants` and `Message.{conversationId,createdAt}` are
 indexed for fast lookups.
