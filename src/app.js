@@ -3,7 +3,10 @@ import morgan from "morgan";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
+import swaggerUi from "swagger-ui-express";
 import "dotenv/config";
+
+import { openApiSpec } from "./config/swagger.js";
 
 // Routes
 import userRouter from "./routes/user.route.js";
@@ -21,6 +24,9 @@ app.use(morgan("dev"));
 
 // Serve uploaded files as static
 // app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
+// API docs (REST + WebSocket reference)
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(openApiSpec));
 
 // API Routes
 app.use("/api", userRouter);
