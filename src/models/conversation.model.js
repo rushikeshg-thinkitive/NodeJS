@@ -33,6 +33,14 @@ const conversationSchema = new mongoose.Schema(
       of: Number,
       default: {},
     },
+    // Read cursor per user — { userId: lastReadTimestamp }. A message is "read
+    // by user X" when its createdAt <= lastReadAt[X]. One write per chat-open
+    // instead of touching every message (drives the ✓✓ read receipts).
+    lastReadAt: {
+      type: Map,
+      of: Date,
+      default: {},
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

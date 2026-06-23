@@ -29,13 +29,6 @@ const messageSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
-    // Users who have read this message (sender is added on create)
-    readBy: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
     // Inline reply — references the quoted message (stays in main list)
     replyTo: {
       type: mongoose.Schema.Types.ObjectId,

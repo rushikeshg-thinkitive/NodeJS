@@ -343,6 +343,13 @@ export const openApiSpec = {
             additionalProperties: { type: "integer" },
             example: { "652f...": 3 },
           },
+          lastReadAt: {
+            type: "object",
+            description:
+              "Map of userId -> last-read timestamp (read cursor; drives read receipts)",
+            additionalProperties: { type: "string", format: "date-time" },
+            example: { "652f...": "2026-06-22T10:00:00.000Z" },
+          },
           createdBy: { type: "string" },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
@@ -364,11 +371,6 @@ export const openApiSpec = {
           text: { type: "string" },
           fileUrl: { type: "string", nullable: true },
           fileName: { type: "string", nullable: true },
-          readBy: {
-            type: "array",
-            items: { type: "string" },
-            description: "User ids who have read this message",
-          },
           replyTo: {
             nullable: true,
             description: "Quoted message id, or populated Message",

@@ -98,7 +98,8 @@ export function initSocket(httpServer) {
           replyTo, // _id of message being replied to (optional)
         } = data;
 
-        // Save message — sender has implicitly read their own message
+        // Save message. (Read state is tracked per-user on the conversation
+        // via lastReadAt, so messages no longer carry a readBy array.)
         const message = await Message.create({
           conversationId,
           senderId,
@@ -107,7 +108,6 @@ export function initSocket(httpServer) {
           fileUrl,
           fileName,
           replyTo: replyTo || null,
-          readBy: [senderId],
         });
 
         // Update conversation last message + bump unread for everyone else
@@ -156,27 +156,28 @@ export function initSocket(httpServer) {
 
     // ─── 6. Mark conversation as read ───────────────────────────────
     // Client emits: { conversationId, userId }
-    // Resets unread count + marks all messages read for this user
+    // Advances this user's read cursor (one write) + resets their unread count.
     socket.on("markAsRead", async ({ conversationId, userId }) => {
       try {
-        // Reset this user's unread count
         const conversation = await Conversation.findById(conversationId);
-        if (conversation) {
-          conversation.unreadCounts.set(userId.toString(), 0);
-          await conversation.save();
-          // Same populated shape as the REST API / other emits.
-          await conversation.populate("participants", "name phoneNumber");
-          io.to(`user:${userId}`).emit("conversationUpdated", conversation);
-        }
+        if (!conversation) return;
 
-        // Add userId to readBy for every message they hadn't read yet
-        await Message.updateMany(
-          { conversationId, readBy: { $nin: [userId] } },
-          { $addToSet: { readBy: userId } },
-        );
+        const readAt = new Date();
+        conversation.lastReadAt.set(userId.toString(), readAt);
+        conversation.unreadCounts.set(userId.toString(), 0);
+        await conversation.save();
 
-        // Notify the room so others can update tick status
-        io.to(conversationId).emit("messagesRead", { conversationId, userId });
+        // Same populated shape as the REST API / other emits.
+        await conversation.populate("participants", "name phoneNumber");
+        io.to(`user:${userId}`).emit("conversationUpdated", conversation);
+
+        // Notify the room so senders can flip their ✓ to ✓✓. The timestamp
+        // lets clients mark every message up to `readAt` as read.
+        io.to(conversationId).emit("messagesRead", {
+          conversationId,
+          userId,
+          readAt,
+        });
       } catch (error) {
         socket.emit("error", { message: error.message });
       }
@@ -215,7 +216,6 @@ export function initSocket(httpServer) {
           fileUrl,
           fileName,
           threadId, // links this reply to the parent message
-          readBy: [senderId],
         });
 
         await message.populate("senderId", "name phoneNumber");

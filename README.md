@@ -104,7 +104,7 @@ Connect to `http://localhost:5000`.
 | `conversationCreated` | conversation                   | each participant's room  | participants **populated** (same shape as REST) |
 | `conversationUpdated` | conversation                   | each participant's room  | participants **populated**; carries `unreadCounts` |
 | `newMessage`          | message                        | the conversation room    | `senderId` + `replyTo` populated |
-| `messagesRead`        | `{ conversationId, userId }`   | the conversation room    | so others update read ticks    |
+| `messagesRead`        | `{ conversationId, userId, readAt }` | the conversation room | advances reader's cursor; others flip ✓→✓✓ |
 | `newThreadMessage`    | message                        | the thread room          | `senderId` populated           |
 | `threadUpdated`       | `{ messageId }`                | the conversation room    | parent now has a thread (sets indicator) |
 | `error`               | `{ message }`                  | the offending socket     | on failures                    |
@@ -124,13 +124,16 @@ Connect to `http://localhost:5000`.
 **User** — `{ name, phoneNumber (unique) }`
 
 **Conversation** — `{ name (null for 1-to-1), isGroup, participants[ref User],
-lastMessage, lastMessageAt, createdBy, unreadCounts (Map userId→count) }`
+lastMessage, lastMessageAt, createdBy, unreadCounts (Map userId→count),
+lastReadAt (Map userId→date) }`
 
 **Message** — `{ conversationId, senderId, type (text|image|file), text, fileUrl,
-fileName, readBy[ref User], replyTo (ref Message), threadId (ref Message), hasThread }`
+fileName, replyTo (ref Message), threadId (ref Message), hasThread }`
 
 - `unreadCounts` — per-user unread tally; bumped on send, reset by `markAsRead`.
-- `readBy` — who has read the message (drives read receipts).
+- `lastReadAt` (on Conversation) — per-user **read cursor**; `markAsRead` sets it to "now"
+  in one write. A message is read by user X when `message.createdAt <= lastReadAt[X]`
+  (drives ✓✓ read receipts). Replaces the old per-message `readBy` array.
 - `replyTo` — inline quote; the message stays in the main list.
 - `threadId` — set on thread replies; main list returns only `threadId: null`.
 - `hasThread` — set `true` on a parent message once it gets its first thread reply;
