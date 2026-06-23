@@ -36,26 +36,28 @@ export function initSocket(httpServer) {
       try {
         const { name, isGroup, participants, createdBy } = data;
 
-        // Prevent duplicate one-to-one
+        // Reuse an existing one-to-one if it already exists, else create.
+        let conversation = null;
         if (!isGroup && participants.length === 2) {
-          const existing = await Conversation.findOne({
+          conversation = await Conversation.findOne({
             isGroup: false,
             participants: { $all: participants },
           });
-          if (existing) {
-            socket.emit("conversationCreated", existing);
-            return;
-          }
+        }
+        if (!conversation) {
+          conversation = await Conversation.create({
+            name,
+            isGroup,
+            participants,
+            createdBy,
+          });
         }
 
-        const conversation = await Conversation.create({
-          name,
-          isGroup,
-          participants,
-          createdBy,
-        });
+        // Send the SAME populated shape the REST API returns, so the frontend
+        // never has to resolve participant names itself.
+        await conversation.populate("participants", "name phoneNumber");
 
-        // Notify every participant's personal room
+        // Notify every participant's personal room (works for new + existing).
         participants.forEach((userId) => {
           io.to(`user:${userId}`).emit("conversationCreated", conversation);
         });
@@ -128,9 +130,13 @@ export function initSocket(httpServer) {
 
           await conversation.save();
 
-          // Update conversation list for all participants
-          conversation.participants.forEach((userId) => {
-            io.to(`user:${userId}`).emit("conversationUpdated", conversation);
+          // Populate participants so the emitted shape matches the REST API.
+          // (Done AFTER the unread loop above, which needs raw ObjectIds.)
+          await conversation.populate("participants", "name phoneNumber");
+
+          // Update conversation list for all participants.
+          conversation.participants.forEach((p) => {
+            io.to(`user:${p._id}`).emit("conversationUpdated", conversation);
           });
         }
 
@@ -158,6 +164,8 @@ export function initSocket(httpServer) {
         if (conversation) {
           conversation.unreadCounts.set(userId.toString(), 0);
           await conversation.save();
+          // Same populated shape as the REST API / other emits.
+          await conversation.populate("participants", "name phoneNumber");
           io.to(`user:${userId}`).emit("conversationUpdated", conversation);
         }
 

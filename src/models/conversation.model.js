@@ -41,8 +41,9 @@ const conversationSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// Index for faster participant lookups
-conversationSchema.index({ participants: 1 });
+// Matches the list query: find({ participants }).sort({ lastMessageAt: -1 }).
+// The leading `participants` field also serves plain participant lookups.
+conversationSchema.index({ participants: 1, lastMessageAt: -1 });
 
 const Conversation = mongoose.model("Conversation", conversationSchema);
 export default Conversation;

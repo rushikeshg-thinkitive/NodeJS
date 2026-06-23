@@ -58,8 +58,11 @@ const messageSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// Index for fast message loading per conversation
-messageSchema.index({ conversationId: 1, createdAt: 1 });
+// Matches the main message query:
+//   find({ conversationId, threadId: null }).sort({ createdAt: -1 })
+messageSchema.index({ conversationId: 1, threadId: 1, createdAt: -1 });
+// Matches the thread query: find({ threadId }).sort({ createdAt: 1 })
+messageSchema.index({ threadId: 1, createdAt: 1 });
 
 const Message = mongoose.model("Message", messageSchema);
 export default Message;

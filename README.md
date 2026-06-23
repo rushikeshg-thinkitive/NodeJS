@@ -101,8 +101,8 @@ Connect to `http://localhost:5000`.
 
 | Event                 | Payload                        | Sent to                  | Notes                          |
 | --------------------- | ------------------------------ | ------------------------ | ------------------------------ |
-| `conversationCreated` | conversation                   | each participant's room  | participants are **IDs only**  |
-| `conversationUpdated` | conversation                   | each participant's room  | carries `unreadCounts`         |
+| `conversationCreated` | conversation                   | each participant's room  | participants **populated** (same shape as REST) |
+| `conversationUpdated` | conversation                   | each participant's room  | participants **populated**; carries `unreadCounts` |
 | `newMessage`          | message                        | the conversation room    | `senderId` + `replyTo` populated |
 | `messagesRead`        | `{ conversationId, userId }`   | the conversation room    | so others update read ticks    |
 | `newThreadMessage`    | message                        | the thread room          | `senderId` populated           |
