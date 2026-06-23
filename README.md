@@ -60,13 +60,18 @@ Base URL: `http://localhost:5000/api`
 | POST   | `/users`                      | `{ name, phoneNumber }`                        | created user                             |
 | GET    | `/users`                      | —                                              | all users                                |
 | POST   | `/conversations`              | `{ name, isGroup, participants[], createdBy }` | created (or existing) conversation       |
-| GET    | `/conversations/:userId`      | `:userId`                                      | that user's conversations (newest first) |
-| GET    | `/messages/:conversationId`   | `:conversationId`                              | top-level messages (oldest first)        |
+| GET    | `/conversations/:userId`      | `:userId` · `?limit=20&before=<ISO>`           | conversations page (newest first)        |
+| GET    | `/messages/:conversationId`   | `:conversationId` · `?limit=50&before=<ISO>`   | messages page (oldest→newest within page) |
 | GET    | `/messages/:messageId/thread` | `:messageId`                                   | replies in that message's thread         |
 | POST   | `/upload`                     | form-data field `file`                         | `{ url: "<cloudinary url>" }`            |
 
 Uploads go to **Cloudinary**; `/upload` returns a full `secure_url`. The main
 message list excludes thread replies (`threadId: null`).
+
+**Cursor pagination** (both list endpoints): `limit` sets the page size (messages 50,
+conversations 20 by default); `before` is an ISO date cursor (`createdAt` for messages,
+`lastMessageAt` for conversations) that returns the page *older* than it. Omit `before`
+for the newest page. This powers WhatsApp-style infinite scroll on the frontend.
 
 > REST is used for **loading history** and **uploading files**. Live actions go
 > through Socket.IO (below).

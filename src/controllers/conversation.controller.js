@@ -33,9 +33,20 @@ export const getConversations = async (req, res) => {
   try {
     const { userId } = req.params; // FIX: read from params (route must have :userId)
 
-    const conversations = await Conversation.find({ participants: userId })
+    // ── Cursor pagination (newest on top, scroll down for older) ──
+    // limit  → page size (default 20)
+    // before → ISO date cursor; return conversations OLDER than this.
+    const limit = Number(req.query.limit) || 20;
+
+    const filter = { participants: userId };
+    if (req.query.before) {
+      filter.lastMessageAt = { $lt: new Date(req.query.before) };
+    }
+
+    const conversations = await Conversation.find(filter)
       .populate("participants", "name phoneNumber")
-      .sort({ lastMessageAt: -1 });
+      .sort({ lastMessageAt: -1 })
+      .limit(limit);
 
     res.json(conversations);
   } catch (error) {
