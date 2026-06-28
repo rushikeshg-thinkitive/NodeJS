@@ -58,7 +58,7 @@ export const openApiSpec = {
   servers: [
     { url: "http://localhost:5000", description: "Local" },
     {
-      url: "https://whatsapp-clone-production-11a5.up.railway.app",
+      url: "https://nodejs-production-d170.up.railway.app",
       description: "Production (Railway)",
     },
   ],
@@ -398,7 +398,10 @@ export const openApiSpec = {
           conversationId: { type: "string" },
           senderId: {
             description: "User id, or populated User object",
-            oneOf: [{ type: "string" }, { $ref: "#/components/schemas/User" }],
+            oneOf: [
+              { type: "string" },
+              { $ref: "#/components/schemas/User" },
+            ],
           },
           type: { type: "string", enum: ["text", "image", "file"] },
           text: { type: "string" },
