@@ -19,7 +19,7 @@ export const getMessages = async (req, res) => {
     // Fetch the newest `limit` (descending), then reverse to ascending so the
     // frontend can render oldest → newest in the page it just received.
     const messages = await Message.find(filter)
-      .populate("senderId", "name phoneNumber")
+      .populate("senderId", "name")
       .populate({
         path: "replyTo",
         populate: { path: "senderId", select: "name" },
@@ -39,7 +39,7 @@ export const getThreadMessages = async (req, res) => {
     const { messageId } = req.params;
 
     const messages = await Message.find({ threadId: messageId })
-      .populate("senderId", "name phoneNumber")
+      .populate("senderId", "name")
       .sort({ createdAt: 1 });
 
     res.json(messages);

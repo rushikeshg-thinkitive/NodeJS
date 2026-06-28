@@ -95,7 +95,7 @@ export const openApiSpec = {
       },
       get: {
         tags: ["Users"],
-        summary: "List all users",
+        summary: "List all users (name + id only — phone is never sent)",
         responses: {
           200: {
             description: "OK",
@@ -108,6 +108,42 @@ export const openApiSpec = {
               },
             },
           },
+          500: { $ref: "#/components/responses/Error" },
+        },
+      },
+    },
+    "/api/users/login": {
+      post: {
+        tags: ["Users"],
+        summary: "Log in by verifying a user's phone number (the secret)",
+        description:
+          "The phone number acts as a password. Pass the chosen user's id and " +
+          "the phone they typed; returns the user only if it matches.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["userId", "phoneNumber"],
+                properties: {
+                  userId: { type: "string" },
+                  phoneNumber: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "OK",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/User" },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Error" },
           500: { $ref: "#/components/responses/Error" },
         },
       },

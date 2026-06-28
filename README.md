@@ -57,8 +57,9 @@ Base URL: `http://localhost:5000/api`
 
 | Method | Endpoint                      | Body / Params                                  | Returns                                  |
 | ------ | ----------------------------- | ---------------------------------------------- | ---------------------------------------- |
-| POST   | `/users`                      | `{ name, phoneNumber }`                        | created user                             |
-| GET    | `/users`                      | —                                              | all users                                |
+| POST   | `/users`                      | `{ name, phoneNumber }`                        | created user (409 if phone already used) |
+| POST   | `/users/login`                | `{ userId, phoneNumber }`                      | the user if the phone matches, else 401  |
+| GET    | `/users`                      | —                                              | all users (**name + id only**, no phone) |
 | POST   | `/conversations`              | `{ name, isGroup, participants[], createdBy }` | created (or existing) conversation       |
 | GET    | `/conversations/:userId`      | `:userId` · `?limit=20&before=<ISO>`           | conversations page (newest first)        |
 | GET    | `/messages/:conversationId`   | `:conversationId` · `?limit=50&before=<ISO>`   | messages page (oldest→newest within page) |
@@ -121,7 +122,8 @@ Connect to `http://localhost:5000`.
 
 ## Data models
 
-**User** — `{ name, phoneNumber (unique) }`
+**User** — `{ name, phoneNumber (unique) }` — the phone number doubles as a login secret
+(verified by `POST /users/login`) and is never returned by `GET /users`.
 
 **Conversation** — `{ name (null for 1-to-1), isGroup, participants[ref User],
 lastMessage, lastMessageAt, createdBy, unreadCounts (Map userId→count),
@@ -165,7 +167,9 @@ src/
 
 ## Notes
 
-- **No auth in V1** — clients identify themselves by sending a `userId`.
+- **Lightweight auth in V1** — login verifies the user's phone number (the secret) via
+  `POST /users/login`; after that, clients identify themselves by sending their `userId`.
+  No tokens/sessions yet, so the `userId` on socket/REST calls is still trusted as-is.
 - **CORS** — the Socket.IO server allows a specific list of origins (localhost
   dev ports + the deployed frontend URL) in `src/socket/socket.js`. Add your own
   frontend origin there if needed.

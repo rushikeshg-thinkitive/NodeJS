@@ -4,6 +4,10 @@ import Message from "../models/message.model.js";
 
 let io;
 
+// Is this user one of the conversation's participants? (works on raw ObjectIds)
+const isParticipant = (conversation, userId) =>
+  conversation.participants.some((p) => p.toString() === userId?.toString());
+
 export function initSocket(httpServer) {
   io = new Server(httpServer, {
     cors: {
@@ -25,6 +29,7 @@ export function initSocket(httpServer) {
     // Client emits: { userId }
     // Server: joins the user's personal room so we can send them notifications
     socket.on("registerUser", ({ userId }) => {
+      socket.data.userId = userId; // remember who this socket is (used for membership checks)
       socket.join(`user:${userId}`);
       console.log(`User ${userId} joined their room`);
     });
@@ -55,7 +60,7 @@ export function initSocket(httpServer) {
 
         // Send the SAME populated shape the REST API returns, so the frontend
         // never has to resolve participant names itself.
-        await conversation.populate("participants", "name phoneNumber");
+        await conversation.populate("participants", "name");
 
         // Notify every participant's personal room (works for new + existing).
         participants.forEach((userId) => {
@@ -68,10 +73,25 @@ export function initSocket(httpServer) {
 
     // ─── 3. Join a conversation room ────────────────────────────────
     // Client emits: { conversationId }
-    // Server: adds socket to that room so it receives new messages
-    socket.on("joinConversation", ({ conversationId }) => {
-      socket.join(conversationId);
-      console.log(`Socket ${socket.id} joined conversation ${conversationId}`);
+    // Server: only lets a user into a conversation they actually belong to,
+    // then adds the socket to that room so it receives new messages.
+    socket.on("joinConversation", async ({ conversationId }) => {
+      try {
+        const conversation =
+          await Conversation.findById(conversationId).select("participants");
+        if (!conversation || !isParticipant(conversation, socket.data.userId)) {
+          socket.emit("error", {
+            message: "Not a participant of this conversation",
+          });
+          return;
+        }
+        socket.join(conversationId);
+        console.log(
+          `Socket ${socket.id} joined conversation ${conversationId}`,
+        );
+      } catch (error) {
+        socket.emit("error", { message: error.message });
+      }
     });
 
     // ─── 4. Leave a conversation room ──────────────────────────────
@@ -98,6 +118,15 @@ export function initSocket(httpServer) {
           replyTo, // _id of message being replied to (optional)
         } = data;
 
+        // Validate FIRST — make sure the conversation exists and the sender
+        // belongs to it BEFORE writing anything (prevents orphan messages and
+        // sending into a conversation you're not part of).
+        const conversation = await Conversation.findById(conversationId);
+        if (!conversation || !isParticipant(conversation, senderId)) {
+          socket.emit("error", { message: "Cannot send to this conversation" });
+          return;
+        }
+
         // Save message. (Read state is tracked per-user on the conversation
         // via lastReadAt, so messages no longer carry a readBy array.)
         const message = await Message.create({
@@ -111,37 +140,33 @@ export function initSocket(httpServer) {
         });
 
         // Update conversation last message + bump unread for everyone else
-        const preview = type === "text" ? text : `[${type}]`;
-        const conversation = await Conversation.findById(conversationId);
-        if (conversation) {
-          conversation.lastMessage = preview;
-          conversation.lastMessageAt = new Date();
+        conversation.lastMessage = type === "text" ? text : `[${type}]`;
+        conversation.lastMessageAt = new Date();
 
-          conversation.participants.forEach((participantId) => {
-            if (participantId.toString() !== senderId.toString()) {
-              const current =
-                conversation.unreadCounts.get(participantId.toString()) || 0;
-              conversation.unreadCounts.set(
-                participantId.toString(),
-                current + 1,
-              );
-            }
-          });
+        conversation.participants.forEach((participantId) => {
+          if (participantId.toString() !== senderId.toString()) {
+            const current =
+              conversation.unreadCounts.get(participantId.toString()) || 0;
+            conversation.unreadCounts.set(
+              participantId.toString(),
+              current + 1,
+            );
+          }
+        });
 
-          await conversation.save();
+        await conversation.save();
 
-          // Populate participants so the emitted shape matches the REST API.
-          // (Done AFTER the unread loop above, which needs raw ObjectIds.)
-          await conversation.populate("participants", "name phoneNumber");
+        // Populate participants so the emitted shape matches the REST API.
+        // (Done AFTER the unread loop above, which needs raw ObjectIds.)
+        await conversation.populate("participants", "name");
 
-          // Update conversation list for all participants.
-          conversation.participants.forEach((p) => {
-            io.to(`user:${p._id}`).emit("conversationUpdated", conversation);
-          });
-        }
+        // Update conversation list for all participants.
+        conversation.participants.forEach((p) => {
+          io.to(`user:${p._id}`).emit("conversationUpdated", conversation);
+        });
 
         // Populate sender + replied-to message before broadcasting
-        await message.populate("senderId", "name phoneNumber");
+        await message.populate("senderId", "name");
         await message.populate({
           path: "replyTo",
           populate: { path: "senderId", select: "name" },
@@ -168,7 +193,7 @@ export function initSocket(httpServer) {
         await conversation.save();
 
         // Same populated shape as the REST API / other emits.
-        await conversation.populate("participants", "name phoneNumber");
+        await conversation.populate("participants", "name");
         io.to(`user:${userId}`).emit("conversationUpdated", conversation);
 
         // Notify the room so senders can flip their ✓ to ✓✓. The timestamp
@@ -208,6 +233,14 @@ export function initSocket(httpServer) {
           fileName,
         } = data;
 
+        // Same guard as sendMessage: the conversation must exist and the sender
+        // must belong to it before we write a reply (no orphan / spoofed replies).
+        const conversation = await Conversation.findById(conversationId);
+        if (!conversation || !isParticipant(conversation, senderId)) {
+          socket.emit("error", { message: "Cannot send to this conversation" });
+          return;
+        }
+
         const message = await Message.create({
           conversationId,
           senderId,
@@ -218,7 +251,7 @@ export function initSocket(httpServer) {
           threadId, // links this reply to the parent message
         });
 
-        await message.populate("senderId", "name phoneNumber");
+        await message.populate("senderId", "name");
 
         // Broadcast to everyone viewing this thread
         io.to(`thread:${threadId}`).emit("newThreadMessage", message);

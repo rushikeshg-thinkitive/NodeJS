@@ -44,7 +44,7 @@ export const getConversations = async (req, res) => {
     }
 
     const conversations = await Conversation.find(filter)
-      .populate("participants", "name phoneNumber")
+      .populate("participants", "name")
       .sort({ lastMessageAt: -1 })
       .limit(limit);
 
