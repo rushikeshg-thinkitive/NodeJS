@@ -208,7 +208,19 @@ export function initSocket(httpServer) {
       }
     });
 
-    // ─── 7. Join / leave a thread room ──────────────────────────────
+    // ─── 7. Typing indicator ────────────────────────────────────────
+    // Client emits: { conversationId, userId, name } while the user types.
+    // Pure relay — nothing is saved (typing is ephemeral). socket.to(...)
+    // sends to everyone in the room EXCEPT the typer.
+    socket.on("typing", ({ conversationId, userId, name }) => {
+      socket.to(conversationId).emit("userTyping", {
+        conversationId,
+        userId,
+        name,
+      });
+    });
+
+    // ─── 8. Join / leave a thread room ──────────────────────────────
     // Client emits: { messageId }  (the parent message _id)
     socket.on("joinThread", ({ messageId }) => {
       socket.join(`thread:${messageId}`);
@@ -218,7 +230,7 @@ export function initSocket(httpServer) {
       socket.leave(`thread:${messageId}`);
     });
 
-    // ─── 8. Send thread message ─────────────────────────────────────
+    // ─── 9. Send thread message ─────────────────────────────────────
     // Client emits: { threadId, conversationId, senderId, type, text?,
     //                 fileUrl?, fileName? }   threadId = parent message _id
     socket.on("sendThreadMessage", async (data) => {
@@ -265,7 +277,7 @@ export function initSocket(httpServer) {
       }
     });
 
-    // ─── 9. Disconnect ──────────────────────────────────────────────
+    // ─── 10. Disconnect ─────────────────────────────────────────────
     socket.on("disconnect", () => {
       console.log("User disconnected:", socket.id);
     });

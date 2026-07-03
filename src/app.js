@@ -11,6 +11,7 @@ import userRouter from "./routes/user.route.js";
 import conversationRouter from "./routes/conversation.route.js";
 import messageRouter from "./routes/message.route.js";
 import uploadRouter from "./routes/upload.route.js";
+import gifRouter from "./routes/gif.route.js";
 
 const app = express();
 
@@ -27,5 +28,6 @@ app.use("/api", userRouter);
 app.use("/api", conversationRouter);
 app.use("/api", messageRouter);
 app.use("/api", uploadRouter);
+app.use("/api", gifRouter);
 
 export default app;

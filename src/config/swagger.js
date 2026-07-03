@@ -32,6 +32,7 @@ const socket = io("http://localhost:5000"); // or the deployed URL
 | \`leaveConversation\` | \`{ conversationId }\` | Leave a conversation room |
 | \`sendMessage\` | \`{ conversationId, senderId, type, text?, fileUrl?, fileName?, replyTo? }\` | Send a message. \`type\` ∈ \`text\|image\|file\`. \`replyTo\` = id of quoted message (optional) |
 | \`markAsRead\` | \`{ conversationId, userId }\` | Reset unread count + mark messages read for this user |
+| \`typing\` | \`{ conversationId, userId, name }\` | "I'm typing" — relayed (not stored) to others in the room |
 | \`joinThread\` | \`{ messageId }\` | Enter a thread room (parent message id) |
 | \`leaveThread\` | \`{ messageId }\` | Leave a thread room |
 | \`sendThreadMessage\` | \`{ threadId, conversationId, senderId, type, text?, fileUrl?, fileName? }\` | Send a reply inside a thread (\`threadId\` = parent message id) |
@@ -44,6 +45,7 @@ const socket = io("http://localhost:5000"); // or the deployed URL
 | \`conversationUpdated\` | \`Conversation\` | Last message / unread count changed |
 | \`newMessage\` | \`Message\` (sender + \`replyTo\` populated) | New message in a conversation room |
 | \`messagesRead\` | \`{ conversationId, userId }\` | A user read the conversation (update read-receipt ticks) |
+| \`userTyping\` | \`{ conversationId, userId, name }\` | Someone else is typing in the room (show "… is typing") |
 | \`newThreadMessage\` | \`Message\` (sender populated) | New reply in a thread room |
 | \`error\` | \`{ message }\` | An emitted action failed |
 `;
@@ -269,6 +271,49 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/gifs": {
+      get: {
+        tags: ["Upload"],
+        summary: "Search Tenor GIFs (proxied; needs TENOR_API_KEY in .env)",
+        parameters: [
+          {
+            name: "q",
+            in: "query",
+            required: true,
+            schema: { type: "string" },
+            description: "Search text, e.g. 'funny cat'",
+          },
+        ],
+        responses: {
+          200: {
+            description: "OK",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      id: { type: "string" },
+                      preview: {
+                        type: "string",
+                        description: "Small GIF for the picker grid",
+                      },
+                      url: {
+                        type: "string",
+                        description: "Full GIF to send as a message",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          503: { $ref: "#/components/responses/Error" },
+          500: { $ref: "#/components/responses/Error" },
+        },
+      },
+    },
     "/api/upload": {
       post: {
         tags: ["Upload"],
@@ -398,10 +443,7 @@ export const openApiSpec = {
           conversationId: { type: "string" },
           senderId: {
             description: "User id, or populated User object",
-            oneOf: [
-              { type: "string" },
-              { $ref: "#/components/schemas/User" },
-            ],
+            oneOf: [{ type: "string" }, { $ref: "#/components/schemas/User" }],
           },
           type: { type: "string", enum: ["text", "image", "file"] },
           text: { type: "string" },

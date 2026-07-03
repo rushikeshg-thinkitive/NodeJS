@@ -15,8 +15,9 @@ Pairs with the React frontend in [`../FE_WEBSOCKET`](../FE_WEBSOCKET).
 - **Multer + Cloudinary** — file uploads (stored on Cloudinary)
 - ES Modules (`"type": "module"`)
 
-**Features:** 1-to-1 & group chat, image/file upload, **unread counts**,
-**read receipts**, **replies (quote)**, and **threads**.
+**Features:** 1-to-1 & group chat, image/file upload, **GIF search (Tenor)**,
+**unread counts**, **read receipts**, **typing indicator**, **replies (quote)**,
+and **threads**.
 
 ---
 
@@ -36,6 +37,9 @@ PORT=5000
 CLOUDINARY_CLOUD_NAME=<your cloud name>
 CLOUDINARY_API_KEY=<your api key>
 CLOUDINARY_API_SECRET=<your api secret>
+
+# Tenor (for GIF search — free key from Google Cloud; optional)
+TENOR_API_KEY=<your tenor api key>
 ```
 
 Start the server (auto-reloads with nodemon):
@@ -65,6 +69,7 @@ Base URL: `http://localhost:5000/api`
 | GET    | `/messages/:conversationId`   | `:conversationId` · `?limit=50&before=<ISO>`   | messages page (oldest→newest within page) |
 | GET    | `/messages/:messageId/thread` | `:messageId`                                   | replies in that message's thread         |
 | POST   | `/upload`                     | form-data field `file`                         | `{ url: "<cloudinary url>" }`            |
+| GET    | `/gifs`                       | `?q=<search>`                                  | Tenor GIFs `[{ id, preview, url }]` (503 if no `TENOR_API_KEY`) |
 
 Uploads go to **Cloudinary**; `/upload` returns a full `secure_url`. The main
 message list excludes thread replies (`threadId: null`).
@@ -93,6 +98,7 @@ Connect to `http://localhost:5000`.
 | `leaveConversation`  | `{ conversationId }`                                                 | Leave a chat room (call before switching) |
 | `sendMessage`        | `{ conversationId, senderId, type, text?, fileUrl?, fileName?, replyTo? }` | Save + broadcast a message     |
 | `markAsRead`         | `{ conversationId, userId }`                                         | Reset unread + mark messages read    |
+| `typing`             | `{ conversationId, userId, name }`                                   | "I'm typing" — relayed, never stored |
 | `joinThread` / `leaveThread` | `{ messageId }`                                             | Enter / leave a thread room          |
 | `sendThreadMessage`  | `{ threadId, conversationId, senderId, type, text?, fileUrl?, fileName? }` | Save + broadcast a thread reply |
 
@@ -106,6 +112,7 @@ Connect to `http://localhost:5000`.
 | `conversationUpdated` | conversation                   | each participant's room  | participants **populated**; carries `unreadCounts` |
 | `newMessage`          | message                        | the conversation room    | `senderId` + `replyTo` populated |
 | `messagesRead`        | `{ conversationId, userId, readAt }` | the conversation room | advances reader's cursor; others flip ✓→✓✓ |
+| `userTyping`          | `{ conversationId, userId, name }` | the conversation room (not the typer) | show "name is typing…" for ~3s |
 | `newThreadMessage`    | message                        | the thread room          | `senderId` populated           |
 | `threadUpdated`       | `{ messageId }`                | the conversation room    | parent now has a thread (sets indicator) |
 | `error`               | `{ message }`                  | the offending socket     | on failures                    |
