@@ -94,7 +94,7 @@ Connect to `http://localhost:5000`.
 | -------------------- | ------------------------------------------------------------------- | ------------------------------------ |
 | `registerUser`       | `{ userId }`                                                         | Join your personal room for notifications |
 | `createConversation` | `{ name, isGroup, participants[], createdBy }`                       | Create a chat, notify participants   |
-| `joinConversation`   | `{ conversationId }`                                                 | Enter a chat room to receive its messages |
+| `joinConversation`   | `{ conversationId }`                                                 | Enter a chat room (acks when joined — the FE loads history only after) |
 | `leaveConversation`  | `{ conversationId }`                                                 | Leave a chat room (call before switching) |
 | `sendMessage`        | `{ conversationId, senderId, type, text?, fileUrl?, fileName?, replyTo? }` | Save + broadcast a message     |
 | `markAsRead`         | `{ conversationId, userId }`                                         | Reset unread + mark messages read    |

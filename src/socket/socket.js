@@ -8,6 +8,14 @@ let io;
 const isParticipant = (conversation, userId) =>
   conversation.participants.some((p) => p.toString() === userId?.toString());
 
+// Emit an event to every participant's personal room (drives the live
+// sidebar). Works before or after populate — p is an ObjectId or a User doc.
+const notifyParticipants = (conversation, event) => {
+  conversation.participants.forEach((p) => {
+    io.to(`user:${p._id ?? p}`).emit(event, conversation);
+  });
+};
+
 export function initSocket(httpServer) {
   io = new Server(httpServer, {
     cors: {
@@ -63,9 +71,7 @@ export function initSocket(httpServer) {
         await conversation.populate("participants", "name");
 
         // Notify every participant's personal room (works for new + existing).
-        participants.forEach((userId) => {
-          io.to(`user:${userId}`).emit("conversationCreated", conversation);
-        });
+        notifyParticipants(conversation, "conversationCreated");
       } catch (error) {
         socket.emit("error", { message: error.message });
       }
@@ -75,7 +81,7 @@ export function initSocket(httpServer) {
     // Client emits: { conversationId }
     // Server: only lets a user into a conversation they actually belong to,
     // then adds the socket to that room so it receives new messages.
-    socket.on("joinConversation", async ({ conversationId }) => {
+    socket.on("joinConversation", async ({ conversationId }, ack) => {
       try {
         const conversation =
           await Conversation.findById(conversationId).select("participants");
@@ -86,6 +92,9 @@ export function initSocket(httpServer) {
           return;
         }
         socket.join(conversationId);
+        // Confirm the join so the client can safely load history AFTER it —
+        // otherwise a message sent in between is neither fetched nor received.
+        ack?.();
         console.log(
           `Socket ${socket.id} joined conversation ${conversationId}`,
         );
@@ -161,9 +170,7 @@ export function initSocket(httpServer) {
         await conversation.populate("participants", "name");
 
         // Update conversation list for all participants.
-        conversation.participants.forEach((p) => {
-          io.to(`user:${p._id}`).emit("conversationUpdated", conversation);
-        });
+        notifyParticipants(conversation, "conversationUpdated");
 
         // Populate sender + replied-to message before broadcasting
         await message.populate("senderId", "name");
@@ -222,8 +229,9 @@ export function initSocket(httpServer) {
 
     // ─── 8. Join / leave a thread room ──────────────────────────────
     // Client emits: { messageId }  (the parent message _id)
-    socket.on("joinThread", ({ messageId }) => {
+    socket.on("joinThread", ({ messageId }, ack) => {
       socket.join(`thread:${messageId}`);
+      ack?.(); // confirmed — client can now load the thread history
     });
 
     socket.on("leaveThread", ({ messageId }) => {
