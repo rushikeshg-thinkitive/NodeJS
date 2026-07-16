@@ -47,6 +47,11 @@ const messageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Set when the sender edits the message (shows an "edited" label).
+    editedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true },
 );

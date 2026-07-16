@@ -98,6 +98,7 @@ Connect to `http://localhost:5000`.
 | `leaveConversation`  | `{ conversationId }`                                                 | Leave a chat room (call before switching) |
 | `sendMessage`        | `{ conversationId, senderId, type, text?, fileUrl?, fileName?, replyTo? }` | Save + broadcast a message     |
 | `markAsRead`         | `{ conversationId, userId }`                                         | Reset unread + mark messages read    |
+| `editMessage`        | `{ messageId, senderId, text }`                                      | Edit your own text message           |
 | `typing`             | `{ conversationId, userId, name }`                                   | "I'm typing" — relayed, never stored |
 | `joinThread` / `leaveThread` | `{ messageId }`                                             | Enter / leave a thread room          |
 | `sendThreadMessage`  | `{ threadId, conversationId, senderId, type, text?, fileUrl?, fileName? }` | Save + broadcast a thread reply |
@@ -112,6 +113,7 @@ Connect to `http://localhost:5000`.
 | `conversationUpdated` | conversation                   | each participant's room  | participants **populated**; carries `unreadCounts` |
 | `newMessage`          | message                        | the conversation room    | `senderId` + `replyTo` populated |
 | `messagesRead`        | `{ conversationId, userId, readAt }` | the conversation room | advances reader's cursor; others flip ✓→✓✓ |
+| `messageEdited`       | message                        | the conversation room    | text changed; swap it in place (`editedAt` set) |
 | `userTyping`          | `{ conversationId, userId, name }` | the conversation room (not the typer) | show "name is typing…" for ~3s |
 | `newThreadMessage`    | message                        | the thread room          | `senderId` populated           |
 | `threadUpdated`       | `{ messageId }`                | the conversation room    | parent now has a thread (sets indicator) |
@@ -137,7 +139,10 @@ lastMessage, lastMessageAt, createdBy, unreadCounts (Map userId→count),
 lastReadAt (Map userId→date) }`
 
 **Message** — `{ conversationId, senderId, type (text|image|file), text, fileUrl,
-fileName, replyTo (ref Message), threadId (ref Message), hasThread }`
+fileName, replyTo (ref Message), threadId (ref Message), hasThread, editedAt }`
+
+- `editedAt` — set when the author edits a text message (`editMessage` event);
+  the UI shows an "edited" label. Only the author can edit, only text messages.
 
 - `unreadCounts` — per-user unread tally; bumped on send, reset by `markAsRead`.
 - `lastReadAt` (on Conversation) — per-user **read cursor**; `markAsRead` sets it to "now"

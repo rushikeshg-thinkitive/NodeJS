@@ -285,7 +285,60 @@ export function initSocket(httpServer) {
       }
     });
 
-    // ─── 10. Disconnect ─────────────────────────────────────────────
+    // ─── 10. Edit message ───────────────────────────────────────────
+    // Client emits: { messageId, senderId, text }
+    // Only the AUTHOR can edit, and only TEXT messages. Broadcasts the
+    // updated message so open chats swap it in place.
+    socket.on("editMessage", async ({ messageId, senderId, text }) => {
+      try {
+        const message = await Message.findById(messageId);
+        if (
+          !message ||
+          message.senderId.toString() !== senderId.toString() ||
+          message.type !== "text" ||
+          !text?.trim()
+        ) {
+          socket.emit("error", { message: "Cannot edit this message" });
+          return;
+        }
+
+        message.text = text.trim();
+        message.editedAt = new Date();
+        await message.save();
+
+        // Same populated shape as newMessage, so the FE can swap it in as-is.
+        await message.populate("senderId", "name");
+        await message.populate({
+          path: "replyTo",
+          populate: { path: "senderId", select: "name" },
+        });
+        io.to(message.conversationId.toString()).emit("messageEdited", message);
+
+        // If this was the conversation's NEWEST message, the sidebar preview
+        // shows its text — update that too.
+        const newest = await Message.findOne({
+          conversationId: message.conversationId,
+          threadId: null,
+        })
+          .sort({ createdAt: -1 })
+          .select("_id");
+        if (newest && newest._id.equals(message._id)) {
+          const conversation = await Conversation.findById(
+            message.conversationId,
+          );
+          if (conversation) {
+            conversation.lastMessage = message.text;
+            await conversation.save();
+            await conversation.populate("participants", "name");
+            notifyParticipants(conversation, "conversationUpdated");
+          }
+        }
+      } catch (error) {
+        socket.emit("error", { message: error.message });
+      }
+    });
+
+    // ─── 11. Disconnect ─────────────────────────────────────────────
     socket.on("disconnect", () => {
       console.log("User disconnected:", socket.id);
     });

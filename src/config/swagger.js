@@ -32,6 +32,7 @@ const socket = io("http://localhost:5000"); // or the deployed URL
 | \`leaveConversation\` | \`{ conversationId }\` | Leave a conversation room |
 | \`sendMessage\` | \`{ conversationId, senderId, type, text?, fileUrl?, fileName?, replyTo? }\` | Send a message. \`type\` ∈ \`text\|image\|file\`. \`replyTo\` = id of quoted message (optional) |
 | \`markAsRead\` | \`{ conversationId, userId }\` | Reset unread count + mark messages read for this user |
+| \`editMessage\` | \`{ messageId, senderId, text }\` | Edit your own TEXT message; emits \`messageEdited\` to the room |
 | \`typing\` | \`{ conversationId, userId, name }\` | "I'm typing" — relayed (not stored) to others in the room |
 | \`joinThread\` | \`{ messageId }\` | Enter a thread room (parent message id) |
 | \`leaveThread\` | \`{ messageId }\` | Leave a thread room |
@@ -45,6 +46,7 @@ const socket = io("http://localhost:5000"); // or the deployed URL
 | \`conversationUpdated\` | \`Conversation\` | Last message / unread count changed |
 | \`newMessage\` | \`Message\` (sender + \`replyTo\` populated) | New message in a conversation room |
 | \`messagesRead\` | \`{ conversationId, userId }\` | A user read the conversation (update read-receipt ticks) |
+| \`messageEdited\` | \`Message\` (sender + \`replyTo\` populated) | A message's text was edited — swap it in place |
 | \`userTyping\` | \`{ conversationId, userId, name }\` | Someone else is typing in the room (show "… is typing") |
 | \`newThreadMessage\` | \`Message\` (sender populated) | New reply in a thread room |
 | \`error\` | \`{ message }\` | An emitted action failed |
@@ -461,6 +463,12 @@ export const openApiSpec = {
             type: "string",
             nullable: true,
             description: "Parent message id when this is a thread reply",
+          },
+          editedAt: {
+            type: "string",
+            format: "date-time",
+            nullable: true,
+            description: "Set when the sender edited the message",
           },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
